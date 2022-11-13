@@ -104,7 +104,7 @@ fn main() {
         producer.push(0.0).unwrap();
     }
 
-    // Create RwLock to monitor current ring state
+    // Create Arc Mutex to monitor current ring state
     let free_len_inner = Arc::new(Mutex::<usize>::new(0));
     let free_len_outer = Arc::clone(&free_len_inner);
 
@@ -155,7 +155,7 @@ fn main() {
     input_stream.play().unwrap();
     output_stream.play().unwrap();
 
-    // Run for 3 seconds before closing
+    // Run for some time and then quit
     println!("Playing for {} seconds...", play_secs);
     for _ in 0..(play_secs*(1000 / display_period)) {
         std::thread::sleep(std::time::Duration::from_millis(display_period));
