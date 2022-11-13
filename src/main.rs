@@ -3,6 +3,7 @@
 
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::sync::{Arc, Mutex};
 use ringbuf::HeapRb;
 
 macro_rules! display_whatevers {
@@ -72,6 +73,12 @@ fn main() {
     // Define latency
     let latency:f32 = 1000.0;
 
+    // Define play length in s
+    let play_secs:u64 = 5;
+
+    // Define display period in ms
+    let display_period:u64 = 250;
+
     let host = cpal::default_host();
     let input_device = host.default_input_device().unwrap();
     let output_device = host.default_output_device().unwrap();
@@ -97,6 +104,10 @@ fn main() {
         producer.push(0.0).unwrap();
     }
 
+    // Create RwLock to monitor current ring state
+    let free_len_inner = Arc::new(Mutex::<usize>::new(0));
+    let free_len_outer = Arc::clone(&free_len_inner);
+
     let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| {
         let mut output_fell_behind = false;
         for &sample in data {
@@ -120,6 +131,8 @@ fn main() {
                 }
             };
         }
+        let mut free_len = free_len_inner.lock().unwrap();
+        *free_len = consumer.free_len();
         if input_fell_behind {
             eprintln!("input stream fell behind: try increasing latency");
         }
@@ -143,8 +156,12 @@ fn main() {
     output_stream.play().unwrap();
 
     // Run for 3 seconds before closing
-    println!("Playing for 3 seconds...");
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    println!("Playing for {} seconds...", play_secs);
+    for _ in 0..(play_secs*(1000 / display_period)) {
+        std::thread::sleep(std::time::Duration::from_millis(display_period));
+        let free_len = free_len_outer.lock().unwrap();
+        println!("Free Ring Buffer Space: {}", free_len);
+    }
 
     drop(input_stream);
     drop(output_stream);
